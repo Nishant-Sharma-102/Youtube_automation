@@ -1,0 +1,4 @@
+# supercronic crontab (runs inside the container, timezone = TZ env = Asia/Kolkata).
+# Daily kids-rhyme generate + upload at 08:00 IST. Output goes to supercronic's stdout
+# (visible via `docker logs`). The script itself also appends to /app/logs.
+0 8 * * * /app/scripts/cron-kids-rhyme.sh

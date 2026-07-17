@@ -1,0 +1,32 @@
+{
+  "name": "giggle-grove-v2",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Automated kids animation pipeline — clean rebuild (SQLite queue).",
+  "scripts": {
+    "db:init": "tsx src/db-init.ts",
+    "generate": "tsx src/generate.ts",
+    "typecheck": "tsc --noEmit",
+    "voice": "tsx src/voice.ts",
+    "attach": "tsx src/attach.ts",
+    "youtube:server": "tsx src/youtube-server.ts",
+    "publish": "tsx src/orchestrate.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
+    "@google/genai": "^0.8.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "ffmpeg-static": "^5.3.0",
+    "googleapis": "^173.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,20 @@
+# Phase 1 (script generation)
+google-genai>=0.3.0
+gspread>=6.0.0
+python-dotenv>=1.0.0
+# Kids-rhyme generator (gen_kids_rhyme.py) calls the Anthropic API over httpx.
+httpx>=0.27.0
+# Voice fallback engine (Microsoft Edge TTS — free, no key). Part of the voice chain.
+edge-tts>=6.1.0
+google-auth-oauthlib>=1.2.0
+
+# Phase 2 (voice) — Google Cloud TTS needs a service account (API keys are rejected).
+# ffmpeg is required at runtime (system ffmpeg, or set HISTORY_FFMPEG).
+google-cloud-texttospeech>=2.16.0
+
+# Phase 3 (images) — Pollinations.ai (no key). requests is also pulled in transitively.
+requests>=2.31.0
+pillow>=10.0.0
+
+# Later phases (install when you reach them):
+# Phase 4 (video):   moviepy

@@ -1,0 +1,27 @@
+# Giggle Grove daily auto-upload — EC2-friendly deployment.
+#   docker compose up -d --build        # start the 08:00 IST daily scheduler
+#   docker compose run --rm rhyme once  # produce + upload one episode now (test)
+#   docker compose logs -f              # watch runs
+services:
+  rhyme:
+    build: .
+    image: giggle-grove-rhyme:latest
+    container_name: giggle-grove-rhyme
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Kolkata          # 08:00 here = 08:00 IST; change for another region
+      KIDS_PRIVACY: public      # public | unlisted | private
+    volumes:
+      # --- secrets (read-only) — must exist on the host next to this file ---
+      - ./.env:/app/.env:ro
+      - ./hindi-history/.env:/app/hindi-history/.env:ro
+      # If you use the Google Cloud TTS fallback, also mount its service-account JSON
+      # at the SAME path that hindi-history/.env points GOOGLE_SERVICE_ACCOUNT_JSON to, e.g.:
+      # - ./hindi-history/service-account.json:/app/hindi-history/service-account.json:ro
+      # --- persistent episode output (survives container recreation) ---
+      - ./hindi-history/data:/app/hindi-history/data
+      - ./hindi-history/images:/app/hindi-history/images
+      - ./hindi-history/renders:/app/hindi-history/renders
+      - ./hindi-history/audio:/app/hindi-history/audio
+      - ./hindi-history/logs:/app/hindi-history/logs
+      - ./logs:/app/logs

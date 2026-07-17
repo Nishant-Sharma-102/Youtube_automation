@@ -1,0 +1,36 @@
+# Secrets — mount at runtime, never bake into the image.
+.env
+.env.*
+**/.env
+**/.env.*
+*.json.key
+**/oauth-client.json
+**/token.json
+**/service-account*.json
+**/*service_account*.json
+
+# Dependencies / build artifacts (reinstalled in the image).
+node_modules
+**/node_modules
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+*.pyc
+
+# Generated episode outputs (persist via a mounted volume instead).
+renders/
+audio/
+logs/
+hindi-history/renders/
+hindi-history/audio/
+hindi-history/images/
+hindi-history/logs/
+hindi-history/data/ep*.json
+scripts/.kids-topic-index
+
+# VCS / editor / misc.
+.git
+.gitignore
+*.log
+.DS_Store

@@ -1,0 +1,47 @@
+# ---- Secrets (NEVER commit) ----
+.env
+*.local.env
+oauth-client.json
+**/oauth-client.json
+token.json
+**/token.json
+*service-account*.json
+*service_account*.json
+credentials.json
+*.pem
+*.key
+# (but DO keep the templates — they're safe)
+!.env.example
+!**/.env.example
+
+# ---- Dependencies / build artifacts ----
+node_modules/
+dist/
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.mypy_cache/
+
+# ---- Databases ----
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ---- Generated episode output ----
+logs/
+**/logs/
+captions/
+renders/
+**/renders/
+audio/
+**/audio/
+hindi-history/images/
+hindi-history/data/ep*.json
+scripts/.kids-topic-index
+
+# ---- OS / editor ----
+.DS_Store
+*.swp

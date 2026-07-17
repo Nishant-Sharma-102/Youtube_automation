@@ -1,0 +1,12 @@
+.venv/
+.env
+service-account.json
+oauth-client.json
+token.json
+*.json.key
+logs/*.log
+audio/
+images/
+renders/
+__pycache__/
+*.pyc
