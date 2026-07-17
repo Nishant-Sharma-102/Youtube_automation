@@ -121,9 +121,7 @@ def _flag_seq(seq: str, hits: set[str], *, sentence_initial: bool) -> None:
     if _generic(tok):
         return
     # A single capital that does NOT start its sentence is almost always a proper
-    # noun (Romulus, Mars, Rhea). A sentence-initial capital is ambiguous, so onlyNow let me test the playlist logic by adding today's already-live video (ep100 → uUYWydHO_AI) to the playlist — this both validates the API calls and puts the existing video into the new playlist:
-    
-    Bash Test playlist create + add against live ep100 video
+    # noun (Romulus, Mars, Rhea). A sentence-initial capital is ambiguous, so only
     # flag it if it is not an ordinary dictionary word.
     if sentence_initial and _DICT is not None and tok.lower() in _DICT:
         return
