@@ -29,7 +29,10 @@ export interface RecentUpload {
 
 /** The tool surface exposed by the YouTube MCP server (brief §4.3). */
 export interface YouTubeService {
-  uploadVideo(p: UploadParams): Promise<{ videoId: string }>;
+  // channelId/channelTitle are additive (backward-compatible): existing callers that
+  // read only `videoId` keep working. They let a publisher confirm which channel the
+  // upload actually landed on — important when several channels share this server.
+  uploadVideo(p: UploadParams): Promise<{ videoId: string; channelId?: string; channelTitle?: string }>;
   setThumbnail(videoId: string, thumbnailPath: string): Promise<void>;
   /** Change privacy (public/unlisted/private). Requires the youtube.force-ssl scope. */
   setPrivacy(videoId: string, privacy: PrivacyStatus): Promise<void>;
@@ -53,7 +56,7 @@ export class RealYouTubeService implements YouTubeService {
     this.yt = google.youtube({ version: "v3", auth: buildAuthenticatedClient(cfg) });
   }
 
-  async uploadVideo(p: UploadParams): Promise<{ videoId: string }> {
+  async uploadVideo(p: UploadParams): Promise<{ videoId: string; channelId?: string; channelTitle?: string }> {
     assertFile(p.filePath, "Video file");
     // googleapis performs a resumable upload for a streamed media body, which is
     // important for reliability on larger renders (brief §4.3).
@@ -78,7 +81,13 @@ export class RealYouTubeService implements YouTubeService {
     });
     const videoId = res.data.id;
     if (!videoId) throw new Error("Upload succeeded but no video id was returned");
-    return { videoId };
+    // The insert response's snippet identifies the owning channel — the source of
+    // truth for "which channel did this land on".
+    return {
+      videoId,
+      channelId: res.data.snippet?.channelId ?? undefined,
+      channelTitle: res.data.snippet?.channelTitle ?? undefined,
+    };
   }
 
   async setThumbnail(videoId: string, thumbnailPath: string): Promise<void> {
@@ -146,12 +155,18 @@ export class MockYouTubeService implements YouTubeService {
   private counter = 0;
   private readonly uploads: RecentUpload[] = [];
 
-  async uploadVideo(p: UploadParams): Promise<{ videoId: string }> {
+  async uploadVideo(p: UploadParams): Promise<{ videoId: string; channelId?: string; channelTitle?: string }> {
     assertFile(p.filePath, "Video file");
     this.counter += 1;
     const videoId = `MOCK_${this.counter.toString().padStart(4, "0")}_${basename(p.filePath)}`;
     this.uploads.unshift({ videoId, title: p.title, publishedAt: "mock" });
-    return { videoId };
+    // Echo a channel label so channel-confirmation is meaningful in mock too. The
+    // publishing orchestrator injects YOUTUBE_MOCK_CHANNEL_LABEL when it spawns us.
+    return {
+      videoId,
+      channelId: "UC_MOCK_CHANNEL",
+      channelTitle: process.env.YOUTUBE_MOCK_CHANNEL_LABEL ?? "Mock Channel",
+    };
   }
 
   async setThumbnail(_videoId: string, thumbnailPath: string): Promise<void> {

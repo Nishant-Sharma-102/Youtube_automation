@@ -1,8 +1,9 @@
-# Deploying the daily kids-rhyme auto-upload on EC2 (Docker)
+# Deploying the daily documentary auto-upload on EC2 (Docker)
 
-This containerizes the full pipeline — **generate rhyme → ElevenLabs voice → 1080p
-render → public upload → add to "Giggle Grove Rhymes" playlist** — and runs it every
-morning at **08:00 IST** via an in-container scheduler (supercronic).
+This containerizes the full pipeline — **topic → Hindi script → deep-voice narration →
+multi-image visuals → suspense music → 1080p render → public upload with Hindi+English
+captions** — and runs it every morning at **08:00 IST** via an in-container scheduler
+(supercronic).
 
 Secrets are **never** baked into the image. You mount your `.env` files (and, if used,
 the Google service-account JSON) at runtime.
@@ -10,9 +11,9 @@ the Google service-account JSON) at runtime.
 ## 1. Launch an EC2 instance
 
 - **AMI:** Amazon Linux 2023 or Ubuntu 22.04+
-- **Type:** `t3.small` (2 GB RAM) is enough; ffmpeg encoding is brief. `t3.micro` works
-  but is tight.
-- **Storage:** 20 GB gp3.
+- **Type:** `t3.medium` (4 GB RAM) recommended — a full multi-image episode does a lot of
+  ffmpeg work. `t3.small` works but is tight.
+- **Storage:** 30 GB gp3 (episodes + images accumulate).
 - **Security group:** no inbound ports needed (outbound only — it just calls APIs).
 
 Install Docker:
@@ -32,15 +33,21 @@ git clone <your-repo> agentic_ai && cd agentic_ai   # or scp the project up
 
 Create the two secret files (they are git-ignored and docker-ignored):
 
-- `./.env` — must contain: `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`,
-  `ELEVENLABS_MODEL`, `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`,
-  `YOUTUBE_MOCK=0`, `GEMINI_API_KEY`.
-- `./hindi-history/.env` — history-side settings (only needed if you use the Google TTS
-  fallback; ElevenLabs is primary). If you set `GOOGLE_SERVICE_ACCOUNT_JSON` there, also
-  mount that JSON file (see the commented line in `docker-compose.yml`).
+- `./.env` — shared secrets: `ANTHROPIC_API_KEY`, `YOUTUBE_CLIENT_ID`,
+  `YOUTUBE_CLIENT_SECRET` (Gemini/ElevenLabs optional).
+- `./documentary/.env` — the documentary channel's own settings, must contain
+  `YOUTUBE_DOCUMENTARY_CHANNEL_REFRESH_TOKEN` (this channel's upload+captions token),
+  plus the pipeline knobs (`DOC_NARRATION_LANGUAGE`, `DOC_MUSIC_MOOD`,
+  `DOC_CAPTION_LANGUAGES`, `DOC_IMAGES_PER_SCENE_MAX`, etc.). If you set
+  `DOC_SERVICE_ACCOUNT_JSON` for the Sheet/Google TTS, also mount that JSON file
+  (see the commented line in `docker-compose.yml`).
 
-> The YouTube refresh token must belong to the target channel and carry an upload +
-> playlist scope. Mint it locally once with `npm run youtube:auth`.
+> The refresh token must belong to the target channel and carry the
+> `youtube.upload` + `youtube.force-ssl` scopes (force-ssl is needed for captions).
+> Mint it locally once with `npm run youtube:auth`.
+
+> ffmpeg: the image ships system ffmpeg and sets `DOC_FFMPEG=ffmpeg`, which overrides
+> any host-specific `DOC_FFMPEG` path in your mounted `.env`.
 
 ## 3. Build & start the scheduler
 
@@ -49,40 +56,36 @@ docker compose up -d --build      # builds the image, starts the 08:00 IST daily
 docker compose logs -f            # watch it
 ```
 
-The container stays up and fires `scripts/cron-kids-rhyme.sh` at 08:00 IST every day
+The container stays up and fires `scripts/cron-documentary.sh` at 08:00 IST every day
 (`restart: unless-stopped` survives reboots).
 
 ## 4. Test it right now (optional)
 
-Produce and upload one episode immediately (uses real API quota, publishes publicly):
+Produce and publish one episode immediately (uses real API quota, publishes publicly):
 
 ```bash
-docker compose run --rm rhyme once
-```
-
-Or a no-cost wiring check (prints topic + next episode #, no generation/upload):
-
-```bash
-docker compose run --rm -e DRY_RUN=1 rhyme once
+docker compose run --rm documentary once
 ```
 
 ## Operations
 
 | Task | Command |
 |---|---|
-| Watch logs | `docker compose logs -f` (also `./logs/cron-kids-rhyme.log`) |
-| Run one now | `docker compose run --rm rhyme once` |
-| Change upload privacy | edit `KIDS_PRIVACY` in `docker-compose.yml`, then `up -d` |
+| Watch logs | `docker compose logs -f` (also `./logs/cron-documentary.log`) |
+| Run one now | `docker compose run --rm documentary once` |
+| Change upload privacy | edit `DOC_PUBLISH_PRIVACY` in `docker-compose.yml`, then `up -d` |
 | Change schedule/timezone | edit `docker/crontab` (cron time) and/or `TZ`, then rebuild |
-| Edit topics | edit `scripts/topics-kids.txt`, then `up -d --build` |
+| Tune visuals/music/voice | edit `documentary/.env` (`DOC_IMAGES_PER_SCENE_MAX`, `DOC_MUSIC_MOOD`, `DOC_EDGE_PITCH`…), then `up -d` |
 | Stop | `docker compose down` |
 
 ## Notes
 
 - **Timezone:** `TZ=Asia/Kolkata` means the `0 8` in `docker/crontab` is 08:00 IST.
   Change `TZ` for another region (the cron time stays "8 AM local").
-- **Persistence:** generated episodes, images, renders, audio, and the topic pointer
-  live on host-mounted volumes, so they survive `down`/`up` and image rebuilds.
-- **Cost:** each run uses ~500 ElevenLabs characters; images are free (Pollinations).
-- **COPPA:** uploads are forced `made_for_kids=TRUE`; YouTube disables comments/cards
-  on kids content regardless of settings — expected, not a bug.
+- **Persistence:** generated episodes, images, renders, audio, music, and the topic
+  queue live on host-mounted volumes, so they survive `down`/`up` and image rebuilds.
+- **Cost:** narration uses the free Edge voice; images are free (Pollinations); music is
+  free (Jamendo CC). Real animation (Kling) is off by default. The main paid call is
+  Claude for the script/metadata/caption-translation.
+- **Runtime:** a full multi-image episode takes ~45 min at `DOC_IMAGES_PER_SCENE_MAX=2`.
+- **Audience:** uploads are `made_for_kids=FALSE` (general-audience documentary).

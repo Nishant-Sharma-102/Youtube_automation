@@ -1,0 +1,14 @@
+.env
+token.json
+oauth-client.json
+service-account.json
+*service-account*.json
+data/topics_mirror.json
+logs/
+audio/
+renders/
+images/
+music/
+videos/
+.venv/
+__pycache__/

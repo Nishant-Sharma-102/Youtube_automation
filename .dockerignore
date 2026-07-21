@@ -28,6 +28,14 @@ hindi-history/images/
 hindi-history/logs/
 hindi-history/data/ep*.json
 scripts/.kids-topic-index
+# Documentary generated outputs — mounted as volumes at runtime, never baked in
+# (rendered episode.mp4 files are hundreds of MB each — huge image / failed build).
+documentary/renders/
+documentary/audio/
+documentary/images/
+documentary/music/
+documentary/logs/
+documentary/videos/
 
 # VCS / editor / misc.
 .git
