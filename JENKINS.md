@@ -31,22 +31,30 @@ sudo mkdir -p /opt/documentary && sudo chown jenkins /opt/documentary
 ```
 Install the Jenkins **Docker Pipeline** and **Credentials Binding** plugins.
 
-### 2. Upload secrets as credentials
-**Manage Jenkins → Credentials → (global) → Add Credentials**, kind = *Secret file*:
+### 2. Upload credentials
+**Manage Jenkins → Credentials → (global) → Add Credentials**:
 
-| Credential ID | Upload this file |
-|---|---|
-| `documentary-root-env` | your `./.env` (Anthropic + YouTube client id/secret) |
-| `documentary-env` | your `./documentary/.env` (channel refresh token + pipeline knobs) |
+| Kind | Credential ID | Value |
+|---|---|---|
+| *Secret file* | `documentary-root-env` | your `./.env` (Anthropic + YouTube client id/secret) |
+| *Secret file* | `documentary-env` | your `./documentary/.env` (channel refresh token + pipeline knobs) |
+| *Username with password* | `github-pat` | GitHub username + a Personal Access Token (repo scope) |
 
-> Using the Google Sheet queue or Cloud TTS fallback? Add a third *Secret file*
-> credential for the service-account JSON and a `withCredentials`/`cp` line to place it
-> at the path `documentary/.env`'s `DOC_SERVICE_ACCOUNT_JSON` points to, plus a mount in
+> `github-pat` is only needed if the repo is **private**. For a public repo the
+> checkout ignores it — you can create a dummy one or remove `credentialsId` from the
+> `git` step in the Jenkinsfile.
+>
+> Using the Google Sheet queue or Cloud TTS fallback? Add a *Secret file* credential
+> for the service-account JSON and a `withCredentials`/`cp` line to place it at the path
+> `documentary/.env`'s `DOC_SERVICE_ACCOUNT_JSON` points to, plus a mount in
 > `docker-compose.yml`. Both are optional (local mirror + free Edge voice work without).
 
 ### 3. Create the pipeline job
-**New Item → Pipeline** (or *Multibranch Pipeline*) → *Pipeline script from SCM* →
-point at this repo. Jenkins auto-detects `Jenkinsfile` at the root.
+**New Item → Pipeline**. Under *Pipeline*, choose **Pipeline script** and paste the
+repo's `Jenkinsfile` (it checks itself out explicitly from GitHub via the `REPO_URL`
+/ `BRANCH` parameters — no "Pipeline script from SCM" config needed). Or, if you prefer,
+use *Pipeline script from SCM* → Git → `https://github.com/Nishant-Sharma-102/Youtube_automation.git`
+→ branch `main` → credential `github-pat`.
 
 ### 4. Run it
 Click **Build with Parameters**. Leave `APP_DIR` default. First run builds the image

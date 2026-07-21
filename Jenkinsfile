@@ -32,6 +32,10 @@ pipeline {
   }
 
   parameters {
+    string(name: 'REPO_URL', defaultValue: 'https://github.com/Nishant-Sharma-102/Youtube_automation.git',
+           description: 'GitHub repository to build from.')
+    string(name: 'BRANCH', defaultValue: 'main',
+           description: 'Branch to build.')
     string(name: 'APP_DIR', defaultValue: '/opt/documentary',
            description: 'Stable host dir the container runs from (holds secrets + volumes).')
     booleanParam(name: 'RUN_ONCE_AFTER_DEPLOY', defaultValue: false,
@@ -41,11 +45,24 @@ pipeline {
   environment {
     IMAGE = 'documentary-daily'
     TAG   = "${env.BUILD_NUMBER}"
+    // Jenkins "Username with password" credential holding a GitHub Personal Access
+    // Token (username = your GitHub user, password = the PAT). Needed only for a
+    // PRIVATE repo; harmless for a public one. Create it under Manage Jenkins →
+    // Credentials with this ID (or change the ID here).
+    GIT_CREDENTIALS_ID = 'github-pat'
   }
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        // Explicit GitHub checkout so this works as a plain Pipeline job (inline
+        // script) — no "Pipeline script from SCM" configuration required. For a
+        // public repo the credentialsId is simply ignored.
+        git branch: "${params.BRANCH}",
+            url: "${params.REPO_URL}",
+            credentialsId: "${env.GIT_CREDENTIALS_ID}"
+        sh 'git --no-pager log -1 --oneline'
+      }
     }
 
     stage('Validate') {
