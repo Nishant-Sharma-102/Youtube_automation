@@ -6,6 +6,7 @@ and a bottom gradient scrim. Exports 1280x720 JPEG.
 """
 from __future__ import annotations
 
+import glob
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -13,6 +14,42 @@ from PIL import Image, ImageDraw, ImageFont
 W, H = 1280, 720
 MARGIN = 70
 MAX_LINES = 3
+
+# Candidate fonts, best-first. Devanagari-capable fonts come first so Hindi thumbnail
+# text renders as real glyphs (Latin-only fonts like Liberation/DejaVu would show
+# tofu boxes for Hindi). All common Debian/Ubuntu install paths are covered.
+_FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+    "/usr/share/fonts/truetype/Sarai/Sarai.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+]
+
+
+def _resolve_font_path(preferred: str | None) -> str:
+    """Return a font file that PIL can actually open. Tries the configured font, then
+    a Devanagari-first candidate list, then any Devanagari/DejaVu TTF on the system."""
+    tried = [preferred] if preferred else []
+    for p in tried + _FONT_CANDIDATES:
+        if p and Path(p).is_file():
+            try:
+                ImageFont.truetype(p, 40)
+                return p
+            except OSError:
+                continue
+    # Last resort: scan for any Devanagari font, then any DejaVu.
+    for pat in ("/usr/share/fonts/**/*evanagari*.ttf", "/usr/share/fonts/**/DejaVuSans*.ttf"):
+        for p in glob.glob(pat, recursive=True):
+            try:
+                ImageFont.truetype(p, 40)
+                return p
+            except OSError:
+                continue
+    raise OSError("No usable TrueType font found. Install fonts-lohit-deva "
+                  "(Devanagari) or set DOC_THUMB_FONT to a valid .ttf.")
 
 
 def _cover(img: Image.Image) -> Image.Image:
@@ -57,6 +94,7 @@ def _wrap_to_fit(draw, text, font_path, max_w):
 
 
 def render_thumbnail(source_path: str, text: str, out_path: Path, font_path: str) -> None:
+    font_path = _resolve_font_path(font_path)   # never crash on a missing/bad font
     base = _scrim(_cover(Image.open(source_path).convert("RGB")))
     draw = ImageDraw.Draw(base)
     font, lines = _wrap_to_fit(draw, text, font_path, W - 2 * MARGIN)
