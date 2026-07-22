@@ -217,8 +217,9 @@ def load_config() -> Config:
         edge_pitch=_env("DOC_EDGE_PITCH") or "-15Hz",  # deep, warm narrator timbre
         # Pollinations key frames (free). 16:9 by default.
         pollinations_model=_env("DOC_POLLINATIONS_MODEL") or "flux",
-        pollinations_width=int(_env("DOC_POLLINATIONS_WIDTH") or "1280"),
-        pollinations_height=int(_env("DOC_POLLINATIONS_HEIGHT") or "720"),
+        # Full-HD source frames so the Ken Burns zoom stays sharp (was 1280x720).
+        pollinations_width=int(_env("DOC_POLLINATIONS_WIDTH") or "1920"),
+        pollinations_height=int(_env("DOC_POLLINATIONS_HEIGHT") or "1080"),
         pollinations_delay_sec=float(_env("DOC_POLLINATIONS_DELAY_SEC") or "2.5"),
         # Kling image-to-video (paid). Verify base URL / auth / rate against YOUR
         # Kling plan — cost_per_sec is the single knob the budget guard multiplies by.

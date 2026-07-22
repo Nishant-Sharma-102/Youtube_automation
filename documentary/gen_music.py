@@ -162,7 +162,10 @@ def main() -> int:
     if cfg.music_mood_override:
         m = cfg.music_mood_override.strip()
         mood_label = f"{m} (override)"
-        query = f"{m} suspense tension dark cinematic instrumental"
+        # Keep it to a few broad tags — Jamendo fuzzytags with many terms returns few
+        # or zero tracks. "suspense"->"dark tense cinematic".
+        query = "dark tense cinematic instrumental" if m.lower() in ("suspense", "suspenseful") \
+            else f"{m} cinematic instrumental"
     source = get_source(cfg)
 
     print(f"[backend={queue.backend}] Episode: [{pillar}] {rec['topic']}")
@@ -172,6 +175,21 @@ def main() -> int:
           f"commercial-only filter: {'ON' if cfg.music_require_commercial else 'off'}\n")
 
     candidates = source.search(bucket, query)
+    # Broaden if the mood query returned too few — fuzzytags can be sparse, and a
+    # monetized channel needs at least a couple of commercial-safe options to pick from.
+    if len(candidates) < 2 and not source.mock:
+        for alt in ("dark cinematic instrumental", "cinematic instrumental", "ambient instrumental"):
+            if alt == query:
+                continue
+            print(f"  only {len(candidates)} track(s) for {query!r} — broadening → {alt!r}")
+            more = source.search(bucket, alt)
+            if len(more) >= 2:
+                candidates, query = more, alt
+                break
+            candidates = candidates or more
+    if source.mock:
+        print("  ⚠️ Jamendo is in MOCK mode (no DOC_JAMENDO_CLIENT_ID) — the music bed will be a\n"
+              "     silent placeholder. Set DOC_JAMENDO_CLIENT_ID in .env for real suspense music.")
     dropped = getattr(source, "filtered_out", [])
     if dropped:
         print(f"License guard dropped {len(dropped)} non-commercial/no-derivatives track(s):")
