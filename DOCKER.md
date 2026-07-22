@@ -51,9 +51,18 @@ Create the two secret files (they are git-ignored and docker-ignored):
 
 ## 3. Build & start the scheduler
 
+**One command** (pulls latest, preflights `.env`, builds, starts the daily job):
+
+```bash
+./scripts/deploy.sh          # or: ./scripts/deploy.sh once   (also publish one now)
+docker compose logs -f       # watch it
+```
+
+Or manually:
+
 ```bash
 docker compose up -d --build      # builds the image, starts the 08:00 IST daily job
-docker compose logs -f            # watch it
+docker compose logs -f
 ```
 
 The container stays up and fires `scripts/cron-documentary.sh` at 08:00 IST every day
