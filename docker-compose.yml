@@ -11,6 +11,9 @@ services:
     pull_policy: build
     container_name: documentary-daily
     restart: unless-stopped
+    # Run tini as PID 1 so it reaps zombies. Without this, supercronic becomes PID 1,
+    # tries to do its own reaping, and crashes with "Failed to fork exec" in a loop.
+    init: true
     environment:
       TZ: Asia/Kolkata            # 08:00 here = 08:00 IST; change for another region
       DOC_PUBLISH_PRIVACY: public # public | unlisted | private

@@ -58,7 +58,10 @@ RUN python3 -m venv /app/documentary/.venv \
 # --- application source ---
 COPY . .
 
-RUN chmod +x scripts/cron-documentary.sh docker/entrypoint.sh \
+# Normalize shell scripts to LF + make executable. A CRLF shebang (from a Windows
+# checkout) makes the kernel look for "/usr/bin/env bash\r" → "no such file or directory".
+RUN sed -i 's/\r$//' scripts/cron-documentary.sh docker/entrypoint.sh docker/crontab \
+    && chmod +x scripts/cron-documentary.sh docker/entrypoint.sh \
     && mkdir -p logs documentary/data documentary/renders documentary/audio \
        documentary/images documentary/music documentary/logs
 
