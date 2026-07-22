@@ -15,7 +15,6 @@ export interface Character {
   personality: string;
   catchphrase: string;
 }
-
 export interface ChannelBible {
   channelName: string;
   audience: string;
