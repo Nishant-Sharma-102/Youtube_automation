@@ -159,6 +159,17 @@ def run(cmd: list[str], label: str) -> None:
         raise SystemExit(f"ffmpeg failed ({label}):\n{r.stderr[-1500:]}")
 
 
+def run_ok(cmd: list[str], label: str) -> bool:
+    """Like run() but returns False instead of aborting — lets the caller fall back."""
+    print(f"  ▶ {label}", flush=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"    ⚠️ ffmpeg failed ({label}) rc={r.returncode}: {r.stderr.strip()[-300:]}",
+              flush=True)
+        return False
+    return True
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--validate", action="store_true",
@@ -240,14 +251,14 @@ def main() -> int:
         else:
             cmd, kind = segment_cmd(cfg, s, i, seg), "still "
         plan.append((f"scene {s['scene_number']:>2} ({kind}, "
-                     f"{float(s['duration_sec']):.1f}s)", cmd))
+                     f"{float(s['duration_sec']):.1f}s)", cmd, i, s, seg, kind))
     list_file = seg_dir / "segments.txt"
     concat_out = rdir / ("concat.mp4" if music else "episode.mp4")
 
     if args.validate:
         print("=== FFMPEG COMMAND PLAN (validate — not executed) ===")
         print(f"# {len(plan)} per-scene segments, e.g.:")
-        for label, cmd in plan[:2]:
+        for label, cmd, *_ in plan[:2]:
             print(f"# {label}\n{' '.join(cmd)}\n")
         print(f"# … {len(plan)-2} more segments …\n")
         print(f"# concat list -> {list_file}")
@@ -262,8 +273,18 @@ def main() -> int:
                          "This box has none — run on EC2, or use --validate.")
 
     seg_dir.mkdir(parents=True, exist_ok=True)
-    for label, cmd in plan:
-        run(cmd, label)
+    for label, cmd, i, s, seg, kind in plan:
+        if run_ok(cmd, label):
+            continue
+        # A multi-image montage is memory-heavy and can be OOM-killed on small hosts.
+        # Fall back to a lightweight single-image Ken Burns segment so ONE heavy scene
+        # never aborts the whole episode.
+        if kind.startswith("multi"):
+            print(f"    ↩ falling back to single-image Ken Burns for scene {s['scene_number']}",
+                  flush=True)
+            if run_ok(segment_cmd(cfg, s, i, seg), f"scene {s['scene_number']:>2} (still fallback)"):
+                continue
+        raise SystemExit(f"ffmpeg failed and no fallback succeeded for: {label}")
     list_file.write_text("".join(f"file '{p.resolve()}'\n" for p in seg_paths), encoding="utf-8")
     run(concat_cmd(cfg, list_file, concat_out), "concat segments")
     if music:
