@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -181,8 +182,15 @@ def main() -> int:
     ap.add_argument("--keep-segments", action="store_true", help="Keep per-scene segment files.")
     args = ap.parse_args()
     # Splice real animated clips by default; is_real_file() ignores MOCK stubs anyway.
-    # --stills-only forces stills for the whole episode.
-    args.use_kling = not args.stills_only
+    # --stills-only (flag OR DOC_STILLS_ONLY env) forces ONE image + Ken Burns per scene
+    # for the whole episode — the lightest, most memory-safe path. Use this on small
+    # hosts where the multi-image montage gets OOM-killed. It applies even to episodes
+    # already generated with multiple images (extra images are simply ignored).
+    env_stills = os.environ.get("DOC_STILLS_ONLY", "").strip().lower() in ("1", "true", "yes", "on")
+    stills_only = args.stills_only or env_stills
+    args.use_kling = not stills_only
+    if stills_only:
+        print("stills-only mode: one image + Ken Burns per scene (multi-image montage disabled).")
 
     cfg = load_config()
     queue = TopicQueue(cfg)
@@ -244,6 +252,8 @@ def main() -> int:
         use_k = args.use_kling and s.get("scene_type") == "kling" and is_real_file(s.get("video_path"))
         # Multi-image still scenes → cross-dissolve montage; single image → Ken Burns.
         imgs = [p for p in (s.get("keyframe_paths") or [s.get("keyframe_path")]) if is_real_file(p)]
+        if stills_only:
+            imgs = imgs[:1]   # force the lightweight single-image path
         if use_k:
             cmd, kind = kling_segment_cmd(cfg, s, seg), "kling"
         elif len(imgs) > 1:
