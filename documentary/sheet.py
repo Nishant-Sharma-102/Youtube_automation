@@ -453,3 +453,47 @@ class TopicQueue:
                 })
             self._write_mirror(mirror)
         return len(fresh)
+
+    def insert_approved_topic(self, topic: str, pillar: str, notes: str = "") -> None:
+        """Append ONE topic already promoted to status='approved' (approved='yes') so
+        the pipeline picks it up immediately — used by the on-demand web UI. Mirrors
+        what cron-documentary.sh does when it promotes a draft."""
+        topic, pillar, notes = topic.strip(), pillar.strip(), notes.strip()
+        if not topic:
+            raise ValueError("topic must not be empty")
+        if self.backend == "sheet":
+            row = [""] * len(COLUMNS)
+            row[COLUMNS.index("topic")] = topic
+            row[COLUMNS.index("pillar")] = pillar
+            row[COLUMNS.index("status")] = "approved"
+            row[COLUMNS.index("approved")] = "yes"
+            row[COLUMNS.index("notes")] = notes
+            self._ws.append_rows([row], value_input_option="USER_ENTERED")
+        else:
+            mirror = self._mirror_rows()
+            mirror.append({
+                "topic": topic, "pillar": pillar, "script": "", "scene_breakdown": "",
+                "status": "approved", "approved": "yes", "scheduled_date": "",
+                "notes": notes, "title_choice": "", "thumbnail_choice": "",
+            })
+            self._write_mirror(mirror)
+
+    def has_active_topic(self) -> dict | None:
+        """Return the first row in an ACTIVE (mid-flight) status, or None. Active =
+        anything between approved and ready inclusive — used to refuse a second
+        concurrent run and to report what the pipeline is currently working on."""
+        active = {"approved", "script_ready", "storyboard_ready", "audio_ready",
+                  "visuals_ready", "music_ready", "assembly_ready", "metadata_ready", "ready"}
+        if self.backend == "sheet":
+            rows = self._ws.get_all_values()
+            s_idx, t_idx = COLUMNS.index("status"), COLUMNS.index("topic")
+            for row in rows[1:]:
+                st = (row[s_idx] if s_idx < len(row) else "").strip().lower()
+                if st in active and (row[t_idx] if t_idx < len(row) else "").strip():
+                    return {"topic": row[t_idx].strip(), "status": st}
+            return None
+        for r in self._mirror_rows():
+            st = (r.get("status") or "").strip().lower()
+            if st in active and (r.get("topic") or "").strip():
+                return {"topic": r["topic"].strip(), "status": st}
+        return None

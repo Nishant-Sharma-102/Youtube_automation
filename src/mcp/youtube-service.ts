@@ -19,6 +19,13 @@ export interface UploadParams {
   categoryId: string;
   /** BCP-47 language of the title/description and audio, e.g. "en". */
   language: string;
+  /**
+   * Whether the video's public statistics (view/like counts) are shown on the watch
+   * page. false ≈ "hide likes". Note: YouTube's Data API has NO field to disable the
+   * like button itself — this is the only related control it exposes. Defaults to true
+   * (YouTube's own default) so existing callers are unaffected.
+   */
+  publicStatsViewable?: boolean;
 }
 
 export interface RecentUpload {
@@ -74,6 +81,8 @@ export class RealYouTubeService implements YouTubeService {
         status: {
           privacyStatus: p.privacyStatus,
           selfDeclaredMadeForKids: p.madeForKids,
+          // false hides the public view/like stats on the watch page ("hide likes").
+          publicStatsViewable: p.publicStatsViewable ?? true,
         },
       },
       // notifySubscribers defaults to true — subscribers get the upload notification.

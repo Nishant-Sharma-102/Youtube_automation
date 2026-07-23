@@ -128,6 +128,63 @@ def _parse_json(text: str) -> dict:
     return json.loads(t)
 
 
+def build_one_prompt(pillar: str, existing_topics: list[str]) -> str:
+    existing_block = ("\n".join(f"- {t}" for t in existing_topics)
+                      if existing_topics else "(none yet)")
+    return f"""Propose ONE excellent documentary topic for the "{pillar}" pillar of the channel.
+
+Requirements:
+- The pillar value MUST be exactly "{pillar}".
+- Fact-check it with web search: it must be a real, well-documented subject (for Alternate
+  History, the historical pivot point must be factual). Evergreen search interest, strong hook,
+  enough depth for a 10-15 minute narrated documentary.
+- Do NOT duplicate or closely resemble any topic already in the queue (listed below).
+
+Topics ALREADY in the queue — avoid these and near-duplicates:
+{existing_block}
+
+When done searching, respond with ONE JSON object and NOTHING else:
+{{"topic": "concise, specific, compelling title/subject",
+  "pillar": "{pillar}",
+  "notes": "one line: why it works + what web search confirmed about its factual basis"}}
+"""
+
+
+def suggest_one(cfg: Config, pillar: str, existing_topics: list[str]) -> dict:
+    """Return a single {topic, pillar, notes} for the given pillar, fact-checked via
+    web search. Used by the on-demand web UI when the user picks a category but leaves
+    the topic blank. Raises SystemExit on API/parse failure."""
+    headers = {
+        "x-api-key": cfg.anthropic_api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    messages = [{"role": "user", "content": build_one_prompt(pillar, existing_topics)}]
+    with httpx.Client(timeout=600.0) as client:
+        for _ in range(MAX_PAUSE_RESUMES + 1):
+            resp = client.post(API, headers=headers, json={
+                "model": cfg.anthropic_model, "max_tokens": 4000, "system": SYSTEM,
+                "tools": [WEB_SEARCH_TOOL], "messages": messages,
+            })
+            if resp.status_code != 200:
+                raise SystemExit(f"Claude API error {resp.status_code}: {resp.text[:800]}")
+            data = resp.json()
+            content = data.get("content", [])
+            if data.get("stop_reason") == "pause_turn":
+                messages.append({"role": "assistant", "content": content})
+                continue
+            text = _extract_text(content)
+            if not text.strip():
+                raise SystemExit("Claude returned no topic text.")
+            obj = _parse_json(text)
+            obj.setdefault("pillar", pillar)
+            obj["pillar"] = pillar  # force the requested category
+            if not obj.get("topic", "").strip():
+                raise SystemExit("Claude returned an empty topic.")
+            return obj
+    raise SystemExit(f"suggest_one web-search turn did not finish after {MAX_PAUSE_RESUMES} resumes.")
+
+
 def generate_topics(cfg: Config, existing_topics: list[str]) -> dict:
     """Return {"accepted": [...], "rejected": [...], "search_count": int}.
 

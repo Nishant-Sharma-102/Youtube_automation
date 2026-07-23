@@ -26,10 +26,17 @@ if ! grep -q '^YOUTUBE_DOCUMENTARY_CHANNEL_REFRESH_TOKEN=..' /app/.env 2>/dev/nu
   echo "      /app/documentary/.env mounted — publishing will fail until it's set." >&2
 fi
 
+PY=/app/documentary/.venv/bin/python
+[ -x "$PY" ] || PY=/app/.venv/bin/python
+
 case "${1:-cron}" in
   cron)
     echo "[entrypoint] starting supercronic — daily documentary at 08:00 ${TZ:-UTC}"
     exec supercronic /app/docker/crontab
+    ;;
+  web)
+    echo "[entrypoint] starting pipeline dashboard on port ${DOC_WEBUI_PORT:-8080}"
+    exec "$PY" /app/dashboard.py
     ;;
   once)
     echo "[entrypoint] one-shot run"

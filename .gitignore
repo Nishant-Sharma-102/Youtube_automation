@@ -42,6 +42,11 @@ hindi-history/images/
 hindi-history/data/ep*.json
 scripts/.kids-topic-index
 
+# ---- Generated pipeline state (runtime, not source) ----
+documentary/data/topics_mirror.json
+documentary/data/*.lock
+shorts/data/short_*.json
+
 # ---- OS / editor ----
 .DS_Store
 *.swp

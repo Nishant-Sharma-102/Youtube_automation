@@ -44,6 +44,8 @@ async function main(): Promise<void> {
         privacy_status: z.enum(["private", "unlisted", "public"]).default("private"),
         category_id: z.string().default("27").describe('YouTube category id; "27" = Education'),
         language: z.string().default("en").describe("BCP-47 language, e.g. 'en'"),
+        public_stats_viewable: z.boolean().default(true)
+          .describe("false hides the public view/like stats on the watch page ('hide likes')"),
       },
     },
     async (args) => {
@@ -56,6 +58,7 @@ async function main(): Promise<void> {
         privacyStatus: args.privacy_status as PrivacyStatus,
         categoryId: args.category_id,
         language: args.language,
+        publicStatsViewable: args.public_stats_viewable,
       });
       log(`upload_video -> ${res.videoId}`);
       return jsonResult(res);

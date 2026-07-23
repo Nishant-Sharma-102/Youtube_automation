@@ -68,6 +68,32 @@ docker compose logs -f
 The container stays up and fires `scripts/cron-documentary.sh` at 08:00 IST every day
 (`restart: unless-stopped` survives reboots).
 
+## Dashboard — manual trigger for both history channels
+
+`docker compose up -d --build` also starts a **dashboard** service
+(`documentary-dashboard`) on port **8080** alongside the daily cron. Open:
+
+```
+http://<EC2_IP>:8080
+```
+
+- **Channel selector**: Documentary or Hindi History.
+- **Category dropdown** (Documentary: History/Mysteries/Science/Alt-History; Hindi
+  History: eras/regions like Maurya Empire, Mughal Empire, British Raj…) **or** a
+  free-text **topic** (blank topic → uses the category / AI picks one).
+- **Run mode**: *Review* (publishes at your chosen privacy so you can check it) or
+  *Fast* (auto-runs and uploads **PRIVATE** — never public, enforced server-side).
+- **Live jobs table**: channel, topic, status, phase, elapsed, and the published link.
+
+Runs are **serial** — one at a time across both channels and the 08:00 cron (a shared
+lock), so heavy ffmpeg jobs never overlap and OOM.
+
+- **Open port 8080** in the EC2 security group (recommend restricting to your own IP),
+  or set `DASHBOARD_TOKEN` on the `dashboard` service for a password. Port via
+  `DOC_WEBUI_PORT`.
+- The Hindi History channel uploads with its own token — put
+  `YOUTUBE_HISTORY_CHANNEL_REFRESH_TOKEN` in your `.env` for that channel to publish.
+
 ## 4. Test it right now (optional)
 
 Produce and publish one episode immediately (uses real API quota, publishes publicly):

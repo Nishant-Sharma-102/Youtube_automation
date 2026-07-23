@@ -48,22 +48,30 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# --- Python deps for the documentary pipeline into an in-repo venv ---
-# cron-documentary.sh prefers documentary/.venv, so install there.
+# --- Python deps into per-pipeline in-repo venvs ---
+# documentary/.venv (cron + dashboard's documentary channel) and hindi-history/.venv
+# (dashboard's Hindi History channel via make_episode.sh).
 COPY documentary/requirements.txt documentary/requirements.txt
+COPY hindi-history/requirements.txt hindi-history/requirements.txt
 RUN python3 -m venv /app/documentary/.venv \
     && /app/documentary/.venv/bin/pip install --upgrade pip \
-    && /app/documentary/.venv/bin/pip install -r documentary/requirements.txt
+    && /app/documentary/.venv/bin/pip install -r documentary/requirements.txt \
+    && python3 -m venv /app/hindi-history/.venv \
+    && /app/hindi-history/.venv/bin/pip install --upgrade pip \
+    && /app/hindi-history/.venv/bin/pip install -r hindi-history/requirements.txt
 
 # --- application source ---
 COPY . .
 
 # Normalize shell scripts to LF + make executable. A CRLF shebang (from a Windows
 # checkout) makes the kernel look for "/usr/bin/env bash\r" → "no such file or directory".
-RUN sed -i 's/\r$//' scripts/cron-documentary.sh docker/entrypoint.sh docker/crontab \
-    && chmod +x scripts/cron-documentary.sh docker/entrypoint.sh \
+RUN sed -i 's/\r$//' scripts/cron-documentary.sh scripts/run-pipeline.sh \
+       hindi-history/make_episode.sh docker/entrypoint.sh docker/crontab \
+    && chmod +x scripts/cron-documentary.sh scripts/run-pipeline.sh \
+       hindi-history/make_episode.sh docker/entrypoint.sh \
     && mkdir -p logs documentary/data documentary/renders documentary/audio \
-       documentary/images documentary/music documentary/logs
+       documentary/images documentary/music documentary/logs \
+       hindi-history/data hindi-history/renders hindi-history/images hindi-history/audio
 
 ENTRYPOINT ["docker/entrypoint.sh"]
 # Default: run the scheduler (fires scripts/cron-documentary.sh at 08:00 IST daily).

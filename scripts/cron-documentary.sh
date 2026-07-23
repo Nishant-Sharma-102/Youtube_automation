@@ -52,30 +52,12 @@ print("No draft topics left to approve.")
 sys.exit(0)
 PYEOF
 
-# 2. Run the pipeline. Each phase reads the status the previous one set. Abort on error.
-run() { echo; echo "#### $1 ####"; shift; "$@" || { echo "PHASE FAILED — aborting today's run."; exit 1; }; }
-run "P2 script"            $PY gen_script.py
-run "P3 storyboard"        $PY gen_storyboard.py
-run "P4 voice"             $PY gen_voice.py
-run "P5 visuals"           $PY gen_visuals.py
-run "P6 music"             $PY gen_music.py
-run "P7 assemble"          $PY assemble.py
-run "P8 metadata+captions" $PY gen_metadata.py
+# 2. Run the phases + publish via the shared, flock-locked runner. If a UI-triggered
+#    run is already holding the lock, this exits 42 (busy) and today's cron is skipped.
+DOC_PUBLISH_PRIVACY="${DOC_PUBLISH_PRIVACY:-public}" "$ROOT/scripts/run-pipeline.sh"
+rc=$?
+if [ "$rc" -eq 42 ]; then
+  echo "A pipeline run is already in progress (UI or a prior cron) — skipping this cron tick."
+fi
 
-# 3. Auto-pick v1 title/thumbnail, finalize to status='ready'.
-$PY - <<'PYEOF'
-import json
-p = "data/topics_mirror.json"; rows = json.load(open(p))
-for r in rows:
-    if r.get("status") == "metadata_ready":
-        r["title_choice"] = "v1"; r["thumbnail_choice"] = "v1"
-        print("Auto-picked v1/v1 for:", r["topic"]); break
-json.dump(rows, open(p, "w"), ensure_ascii=False, indent=2)
-PYEOF
-run "finalize" $PY finalize.py
-
-# 4. Publish (public) — orchestrator refuses if not exactly one 'ready' row.
-echo; echo "#### PUBLISH ####"
-node orchestrator_documentary.js --privacy public
-
-echo "=========== cron-documentary done: $(date '+%Y-%m-%d %H:%M:%S %Z') ==========="
+echo "=========== cron-documentary done: $(date '+%Y-%m-%d %H:%M:%S %Z') (rc=$rc) ==========="

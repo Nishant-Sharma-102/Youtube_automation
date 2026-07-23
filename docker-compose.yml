@@ -1,39 +1,59 @@
-# Documentary channel daily auto-upload — EC2-friendly deployment.
-#   docker compose up -d --build           # start the 08:00 IST daily scheduler
+# Documentary channel — EC2-friendly deployment.
+#   docker compose up -d --build              # start BOTH: 08:00 daily cron + web UI (:8080)
 #   docker compose run --rm documentary once  # produce + publish one episode now (test)
-#   docker compose logs -f                 # watch runs
+#   docker compose logs -f                    # watch runs
+# The web UI is at http://<host>:8080 — pick a category, click Generate & Upload.
+
+# Shared config for both services (same image + secrets + volumes).
+x-doc-common: &doc-common
+  build: .
+  image: documentary-daily:latest
+  # Always build locally from ./Dockerfile; never pull (image isn't published).
+  pull_policy: build
+  # tini as PID 1 reaps zombies (supercronic would otherwise crash-loop as PID 1).
+  init: true
+  environment: &doc-env
+    TZ: Asia/Kolkata            # 08:00 here = 08:00 IST; change for another region
+    DOC_PUBLISH_PRIVACY: public # public | unlisted | private
+    DOC_FFMPEG: ffmpeg          # container ships system ffmpeg; overrides host .env path
+  volumes:
+    # --- secrets (read-only) — ONE .env holds everything (shared + DOC_* + token) ---
+    - ./.env:/app/.env:ro
+    # (Optional) split channel secrets into their own file — uncomment to override:
+    # - ./documentary/.env:/app/documentary/.env:ro
+    # (Optional) Google service-account JSON for the Sheet / Cloud TTS:
+    # - ./documentary/service-account.json:/app/documentary/service-account.json:ro
+    # --- persistent output + the SHARED queue/lock (both services mount these) ---
+    - ./documentary/data:/app/documentary/data      # topic queue + .pipeline.lock (shared)
+    - ./documentary/images:/app/documentary/images
+    - ./documentary/renders:/app/documentary/renders
+    - ./documentary/audio:/app/documentary/audio
+    - ./documentary/music:/app/documentary/music
+    - ./documentary/logs:/app/documentary/logs
+    # --- Hindi History output (dashboard's History channel; make_episode.sh) ---
+    - ./hindi-history/data:/app/hindi-history/data
+    - ./hindi-history/images:/app/hindi-history/images
+    - ./hindi-history/renders:/app/hindi-history/renders
+    - ./hindi-history/audio:/app/hindi-history/audio
+    - ./logs:/app/logs
+
 services:
+  # Daily unattended auto-upload at 08:00 (container CMD defaults to "cron").
   documentary:
-    build: .
-    image: documentary-daily:latest
-    # Always build locally from ./Dockerfile; never try to pull from a registry
-    # (the image is not published anywhere — pulling gives "access denied").
-    pull_policy: build
+    <<: *doc-common
     container_name: documentary-daily
     restart: unless-stopped
-    # Run tini as PID 1 so it reaps zombies. Without this, supercronic becomes PID 1,
-    # tries to do its own reaping, and crashes with "Failed to fork exec" in a loop.
-    init: true
+
+  # Manual-trigger dashboard (Documentary + Hindi History): pick a category/topic,
+  # choose review vs fast (fast = PRIVATE only), watch live status. Serial queue.
+  dashboard:
+    <<: *doc-common
+    container_name: documentary-dashboard
+    restart: unless-stopped
+    command: ["web"]
     environment:
-      TZ: Asia/Kolkata            # 08:00 here = 08:00 IST; change for another region
-      DOC_PUBLISH_PRIVACY: public # public | unlisted | private
-      DOC_FFMPEG: ffmpeg          # container ships system ffmpeg; overrides host .env path
-    volumes:
-      # --- secrets (read-only) — ONE .env holds everything (shared + DOC_* + token).
-      # config.py and the orchestrator both fall back to the root .env, so a single
-      # file is enough; must exist on the host next to this compose file. ---
-      - ./.env:/app/.env:ro
-      # (Optional) split channel secrets into their own file instead — if you create it,
-      # uncomment this and it overrides matching keys from the root .env:
-      # - ./documentary/.env:/app/documentary/.env:ro
-      # If you use the Google Cloud TTS fallback / Sheet, also mount its service-account
-      # JSON at the path DOC_SERVICE_ACCOUNT_JSON points to, e.g.:
-      # - ./documentary/service-account.json:/app/documentary/service-account.json:ro
-      # --- persistent episode output (survives container recreation) ---
-      - ./documentary/data:/app/documentary/data
-      - ./documentary/images:/app/documentary/images
-      - ./documentary/renders:/app/documentary/renders
-      - ./documentary/audio:/app/documentary/audio
-      - ./documentary/music:/app/documentary/music
-      - ./documentary/logs:/app/documentary/logs
-      - ./logs:/app/logs
+      <<: *doc-env
+      DOC_WEBUI_PORT: "8080"
+      # DASHBOARD_TOKEN: "set-a-password-here"   # optional; empty = open access
+    ports:
+      - "8080:8080"
